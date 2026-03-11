@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8"/>
+  <title>Hyperlink Manager</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      font-size: 13px;
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    .header {
+      background: #2b579a;
+      color: white;
+      padding: 12px 16px;
+      font-size: 15px;
+      font-weight: 600;
+    }
+
+    .section {
+      background: white;
+      margin: 10px;
+      padding: 12px;
+      border-radius: 4px;
+      border: 1px solid #ddd;
+    }
+
+    .section h3 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 10px;
+      letter-spacing: 0.5px;
+    }
+
+    button {
+      background: #2b579a;
+      color: white;
+      border: none;
+      padding: 7px 14px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 13px;
+      width: 100%;
+    }
+
+    button:hover { background: #1e3f73; }
+
+    button.secondary {
+      background: #fff;
+      color: #2b579a;
+      border: 1px solid #2b579a;
+      margin-top: 6px;
+    }
+
+    button.secondary:hover { background: #eef2f9; }
+
+    button.danger {
+      background: #c42b1c;
+      margin-top: 6px;
+    }
+
+    button.danger:hover { background: #a02316; }
+
+    #linkList {
+      max-height: 280px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      border-radius: 3px;
+    }
+
+    .link-item {
+      display: flex;
+      align-items: flex-start;
+      padding: 8px 10px;
+      border-bottom: 1px solid #eee;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .link-item:last-child { border-bottom: none; }
+    .link-item:hover { background: #f0f4fb; }
+    .link-item.selected { background: #dce6f7; }
+
+    .link-item input[type="checkbox"] {
+      margin-top: 2px;
+      flex-shrink: 0;
+      width: auto;
+    }
+
+    .link-info { flex: 1; min-width: 0; }
+
+    .link-title {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .link-url {
+      font-size: 11px;
+      color: #888;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .no-links {
+      padding: 16px;
+      text-align: center;
+      color: #999;
+      font-style: italic;
+    }
+
+    .rename-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .rename-row label {
+      font-size: 11px;
+      color: #666;
+      width: 60px;
+      flex-shrink: 0;
+    }
+
+    .rename-row input {
+      flex: 1;
+      padding: 5px 8px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      font-size: 13px;
+    }
+
+    .rename-row input:focus {
+      outline: none;
+      border-color: #2b579a;
+    }
+
+    #rulesList { margin-bottom: 8px; }
+
+    .filter-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .filter-row input {
+      flex: 1;
+      padding: 5px 8px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      font-size: 13px;
+    }
+
+    .filter-row input:focus {
+      outline: none;
+      border-color: #2b579a;
+    }
+
+    .filter-row button {
+      width: auto;
+      padding: 5px 10px;
+    }
+
+    .status {
+      padding: 8px 10px;
+      border-radius: 3px;
+      font-size: 12px;
+      margin-top: 8px;
+      display: none;
+    }
+
+    .status.success { background: #dff6dd; color: #107c10; display: block; }
+    .status.error   { background: #fde7e9; color: #c42b1c; display: block; }
+    .status.info    { background: #deecf9; color: #005a9e; display: block; }
+
+    .select-bar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+
+    .select-bar button {
+      width: auto;
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+
+    .count-badge {
+      display: inline-block;
+      background: #2b579a;
+      color: white;
+      border-radius: 10px;
+      padding: 1px 7px;
+      font-size: 11px;
+      margin-left: 6px;
+    }
+
+    .arrow { font-size: 16px; color: #999; flex-shrink: 0; align-self: center; }
+  </style>
+</head>
+<body>
+
+<div class="header">🔗 Hyperlink Manager</div>
+
+<!-- SCAN SECTION -->
+<div class="section">
+  <h3>1. Scan Document</h3>
+  <div class="filter-row">
+    <input type="text" id="filterInput" placeholder="Filter by title or URL…"/>
+    <button onclick="applyFilter()" style="width:auto;padding:5px 10px;">Filter</button>
+  </div>
+  <button onclick="scanLinks()">Scan for Hyperlinks</button>
+  <div id="scanStatus" class="status"></div>
+</div>
+
+<!-- LINK LIST SECTION -->
+<div class="section">
+  <h3>2. Select Links <span id="selectedCount" class="count-badge">0 selected</span></h3>
+  <div class="select-bar">
+    <button class="secondary" onclick="selectAll()" style="margin:0">Select All</button>
+    <button class="secondary" onclick="selectNone()" style="margin:0">Clear</button>
+    <button class="secondary" onclick="invertSelection()" style="margin:0">Invert</button>
+  </div>
+  <div id="linkList">
+    <div class="no-links">Click "Scan for Hyperlinks" to begin.</div>
+  </div>
+</div>
+
+<!-- RENAME RULES SECTION -->
+<div class="section">
+  <h3>3. Define Rename Rules</h3>
+  <div id="rulesList"></div>
+  <button class="secondary" onclick="addRule()" style="margin-bottom:6px">+ Add Rule</button>
+  <button onclick="applyRenames()">Apply Renames to Selected</button>
+  <button class="secondary" onclick="autoPopulateRules()">Auto-fill from Selected</button>
+  <div id="applyStatus" class="status"></div>
+</div>
+
+<script>
+  Office.onReady(function(info) {
+    if (info.host === Office.HostType.Word) {
+      addRule(); // start with one empty rule
+    }
+  });
+
+  let allLinks = [];       // { title, url, index }
+  let filteredLinks = [];  // currently displayed subset
+
+  // ─── SCAN ───────────────────────────────────────────────────────────────────
+
+  async function scanLinks() {
+    showStatus('scanStatus', 'Scanning…', 'info');
+    allLinks = [];
+
+    try {
+      await Word.run(async (context) => {
+        const body = context.document.body;
+        const contentControls = body.contentControls;
+        contentControls.load('items');
+
+        // Load all hyperlinks via search
+        // Word JS API: iterate through all fields to find hyperlinks
+        const fields = body.fields;
+        fields.load('items');
+        await context.sync();
+
+        let index = 0;
+        for (const field of fields.items) {
+          field.load('code,result');
+        }
+        await context.sync();
+
+        for (const field of fields.items) {
+          const code = field.code || '';
+          if (code.trim().toUpperCase().startsWith('HYPERLINK')) {
+            // Extract URL from field code: HYPERLINK "url"
+            const urlMatch = code.match(/HYPERLINK\s+"([^"]+)"/i);
+            const url = urlMatch ? urlMatch[1] : '';
+
+            // Get display text
+            const resultRange = field.result;
+            resultRange.load('text');
+            await context.sync();
+
+            allLinks.push({
+              title: resultRange.text.trim(),
+              url: url,
+              index: index,
+              field: field,
+              resultRange: resultRange
+            });
+            index++;
+          }
+        }
+      });
+
+      filteredLinks = [...allLinks];
+      renderLinkList(filteredLinks);
+
+      if (allLinks.length === 0) {
+        showStatus('scanStatus', 'No hyperlinks found in this document.', 'info');
+      } else {
+        showStatus('scanStatus', `Found ${allLinks.length} hyperlink(s).`, 'success');
+      }
+    } catch (e) {
+      showStatus('scanStatus', 'Error scanning document: ' + e.message, 'error');
+    }
+  }
+
+  // ─── FILTER ─────────────────────────────────────────────────────────────────
+
+  function applyFilter() {
+    const query = document.getElementById('filterInput').value.trim().toLowerCase();
+    if (!query) {
+      filteredLinks = [...allLinks];
+    } else {
+      filteredLinks = allLinks.filter(l =>
+        l.title.toLowerCase().includes(query) ||
+        l.url.toLowerCase().includes(query)
+      );
+    }
+    renderLinkList(filteredLinks);
+  }
+
+  // ─── RENDER LIST ────────────────────────────────────────────────────────────
+
+  function renderLinkList(links) {
+    const container = document.getElementById('linkList');
+    if (links.length === 0) {
+      container.innerHTML = '<div class="no-links">No links match your filter.</div>';
+      updateSelectedCount();
+      return;
+    }
+
+    container.innerHTML = '';
+    links.forEach((link, i) => {
+      const item = document.createElement('div');
+      item.className = 'link-item' + (link.selected ? ' selected' : '');
+      item.dataset.index = link.index;
+
+      item.innerHTML = `
+        <input type="checkbox" ${link.selected ? 'checked' : ''}
+               onchange="toggleSelect(${link.index}, this.checked)" />
+        <div class="link-info">
+          <div class="link-title" title="${escHtml(link.title)}">${escHtml(link.title) || '<em style="color:#aaa">no title</em>'}</div>
+          <div class="link-url" title="${escHtml(link.url)}">${escHtml(link.url)}</div>
+        </div>
+      `;
+
+      item.addEventListener('click', function(e) {
+        if (e.target.type !== 'checkbox') {
+          const cb = item.querySelector('input[type=checkbox]');
+          cb.checked = !cb.checked;
+          toggleSelect(link.index, cb.checked);
+        }
+      });
+
+      container.appendChild(item);
+    });
+
+    updateSelectedCount();
+  }
+
+  function toggleSelect(linkIndex, checked) {
+    const link = allLinks.find(l => l.index === linkIndex);
+    if (link) link.selected = checked;
+
+    // Update visual state
+    const items = document.querySelectorAll('.link-item');
+    items.forEach(item => {
+      if (parseInt(item.dataset.index) === linkIndex) {
+        item.classList.toggle('selected', checked);
+      }
+    });
+
+    updateSelectedCount();
+  }
+
+  function selectAll() {
+    filteredLinks.forEach(l => l.selected = true);
+    renderLinkList(filteredLinks);
+  }
+
+  function selectNone() {
+    filteredLinks.forEach(l => l.selected = false);
+    renderLinkList(filteredLinks);
+  }
+
+  function invertSelection() {
+    filteredLinks.forEach(l => l.selected = !l.selected);
+    renderLinkList(filteredLinks);
+  }
+
+  function updateSelectedCount() {
+    const count = allLinks.filter(l => l.selected).length;
+    document.getElementById('selectedCount').textContent = count + ' selected';
+  }
+
+  // ─── RULES ──────────────────────────────────────────────────────────────────
+
+  let ruleCount = 0;
+
+  function addRule(fromText = '', toText = '') {
+    ruleCount++;
+    const id = ruleCount;
+    const row = document.createElement('div');
+    row.id = 'rule-' + id;
+    row.style.cssText = 'margin-bottom:8px;';
+
+    row.innerHTML = `
+      <div style="display:flex;gap:4px;align-items:center;">
+        <input type="text" placeholder="Find title…" value="${escHtml(fromText)}"
+               id="from-${id}" style="flex:1;padding:5px 8px;border:1px solid #ccc;border-radius:3px;font-size:13px;"/>
+        <span class="arrow">→</span>
+        <input type="text" placeholder="Replace with…" value="${escHtml(toText)}"
+               id="to-${id}" style="flex:1;padding:5px 8px;border:1px solid #ccc;border-radius:3px;font-size:13px;"/>
+        <button onclick="removeRule(${id})"
+                style="width:auto;padding:4px 8px;background:#c42b1c;margin:0;font-size:12px;">✕</button>
+      </div>
+    `;
+    document.getElementById('rulesList').appendChild(row);
+  }
+
+  function removeRule(id) {
+    const el = document.getElementById('rule-' + id);
+    if (el) el.remove();
+  }
+
+  function getRules() {
+    const rules = [];
+    const rows = document.querySelectorAll('#rulesList > div[id^="rule-"]');
+    rows.forEach(row => {
+      const id = row.id.replace('rule-', '');
+      const from = document.getElementById('from-' + id).value.trim();
+      const to   = document.getElementById('to-'   + id).value.trim();
+      if (from) rules.push({ from, to });
+    });
+    return rules;
+  }
+
+  // Auto-populate "Find" fields from selected links
+  function autoPopulateRules() {
+    const selected = allLinks.filter(l => l.selected);
+    if (selected.length === 0) {
+      showStatus('applyStatus', 'Select some links first.', 'error');
+      return;
+    }
+
+    // Clear existing rules
+    document.getElementById('rulesList').innerHTML = '';
+    ruleCount = 0;
+
+    // Deduplicate by title
+    const seen = new Set();
+    selected.forEach(l => {
+      if (!seen.has(l.title)) {
+        seen.add(l.title);
+        addRule(l.title, '');
+      }
+    });
+
+    showStatus('applyStatus', `Created ${seen.size} rule(s) from selected links.`, 'info');
+  }
+
+  // ─── APPLY RENAMES ──────────────────────────────────────────────────────────
+
+  async function applyRenames() {
+    const rules = getRules();
+    const selected = allLinks.filter(l => l.selected);
+
+    if (selected.length === 0) {
+      showStatus('applyStatus', 'No links selected.', 'error');
+      return;
+    }
+    if (rules.length === 0) {
+      showStatus('applyStatus', 'No rename rules defined.', 'error');
+      return;
+    }
+
+    showStatus('applyStatus', 'Applying renames…', 'info');
+    let changeCount = 0;
+
+    try {
+      await Word.run(async (context) => {
+        for (const link of selected) {
+          const matchingRule = rules.find(r => r.from === link.title);
+          if (!matchingRule) continue;
+          if (matchingRule.to === link.title) continue; // no change needed
+
+          // Replace the text content of the hyperlink's result range
+          link.resultRange.insertText(matchingRule.to, Word.InsertLocation.replace);
+          link.title = matchingRule.to; // update our local cache
+          changeCount++;
+        }
+        await context.sync();
+      });
+
+      // Re-render with updated titles
+      renderLinkList(filteredLinks);
+
+      if (changeCount === 0) {
+        showStatus('applyStatus', 'No matching rules found for selected links.', 'info');
+      } else {
+        showStatus('applyStatus', `✓ Updated ${changeCount} hyperlink(s) successfully.`, 'success');
+      }
+    } catch (e) {
+      showStatus('applyStatus', 'Error applying renames: ' + e.message, 'error');
+    }
+  }
+
+  // ─── UTILITIES ──────────────────────────────────────────────────────────────
+
+  function showStatus(id, msg, type) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.className = 'status ' + type;
+  }
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+</script>
+</body>
+</html>
